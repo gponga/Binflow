@@ -1,0 +1,9 @@
+BinFlow {{VERSION}} - panel para Adobe Premiere Pro (macOS)
+
+1. Descomprime esta carpeta.
+2. Haz clic derecho en "Instalar BinFlow.command" > Abrir > Abrir (la primera vez macOS lo pide; si lo bloquea, repite el clic derecho > Abrir).
+3. Cierra Premiere del todo y vuelve a abrirlo. Ventana > Extensiones > BinFlow.
+4. Si tenías una versión antigua de BinFlow (com.gponga.organizer), el instalador te pregunta si quieres apartarla para no tener dos paneles.
+
+Prueba siempre con una COPIA del proyecto, nunca el original.
+Aún no se ha probado en un Premiere real: úsalo con cuidado y avisa de cualquier fallo.

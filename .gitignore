@@ -1,0 +1,8 @@
+.DS_Store
+._*
+*.swp
+node_modules/
+# Salida de tools/publicar_version.sh (los zips van como assets de la Release, no al repositorio)
+_salida/
+*.zip
+.debug

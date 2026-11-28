@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>BinFlow · panel real con motor simulado</title>
+<link rel="stylesheet" href="../plugin/com.binflow.organizer/style.css">
+<style>
+  #harness{position:sticky;top:0;z-index:5;background:#111;color:#ddd;font:11px/1.4 system-ui;padding:6px 8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  #harness button{font:11px system-ui;padding:3px 7px;border:1px solid #555;background:#222;color:#ddd;border-radius:5px;cursor:pointer}
+  #harness button.on{background:#F6CB44;color:#2E2E30;border-color:#F6CB44}
+  body{max-width:384px;margin:0 auto;border-left:1px solid #444;border-right:1px solid #444}
+</style>
+</head>
+<body>
+<!-- Arnés de pruebas: el panel REAL (main.js + ui-logic.js) con un Premiere y un motor simulados. Nada toca disco. -->
+<div id="harness"></div>
+<div id="screen"></div>
+<!-- Modo CEP mixto (--enable-nodejs --mixed-context): la página tiene `module`, `exports` y `require` globales. -->
+<script>window.module = { exports: {} }; window.exports = window.module.exports;</script>
+<script>
+(function () {
+  var SC = [['ok','Todo bien'],['unreadable','Ilegibles'],['interrupted','Interrumpida'],['other','Otro .prproj'],['otherbad','.prproj ilegible'],['space','Poco espacio'],['missing','Faltan medios'],['changed','Distinto'],['outside','Enlace simbólico'],['unsafe','Raíz del disco']];
+  var env = window.__env = { scenario: 'ok', recovered: false, hasSession: false, openName: 'Spot_Verano_v3', log: [] };
+  var PROJ = '/Volumes/Rodaje/Spot_Verano/Premiere';
+  function log(x) { env.log.push(x); }
+
+  function makePlan() {
+    var sc = env.scenario, ops = [], i, cats = [['Videos', 142], ['Music & SFX', 31], ['Images', 58], ['Graphics', 17]];
+    var assets = PROJ + '/01 Assets';
+    cats.forEach(function (c) { for (i = 0; i < Math.min(c[1], 12); i++) ops.push({ type: 'move', source: PROJ + '/Brutos/' + c[0] + '_' + i + '.dat', dest: assets + '/' + c[0] + '/' + c[0] + '_' + i + '.dat', size: 1000 }); });
+    for (i = 0; i < 4; i++) ops.push({ type: 'move', source: PROJ + '/viejo' + i + '.txt', dest: assets + '/_No usados/Docs/viejo' + i + '.txt', size: 10, reason: 'no usado' });
+    var ext = [['tema_verano.wav', '/Volumes/Archivo/Música/tema_verano.wav', 640], ['Dron_playa_01.mov', '/Volumes/Archivo/Dron/Dron_playa_01.mov', 520], ['locucion_final.wav', '/Volumes/Escritorio/locucion_final.wav', 60]];
+    ext.forEach(function (e) { ops.push({ type: 'copy', source: e[1], dest: assets + '/Music & SFX/' + e[0], size: e[2] * 1048576 }); });
+    var plan = { projectPath: PROJ + '/Spot_Verano_v3.prproj', projectFolder: PROJ, assetsDir: assets, ops: ops, items: [], binMoves: [], groups: [], missing: [], ambiguous: [], manual: [{ name: 'Rotulo_Titulo.aegraphic', path: PROJ + '/Graficos/Rotulo_Titulo.aegraphic', dest: assets + '/Graphics/Rotulo_Titulo.aegraphic', type: 'move', offline: true, moved: true }], warnings: [], confirmations: [], otherProjects: [], unreadable: [], suggestedRoot: null, blocked: false, blockReason: '',
+      unused: [], summary: { moves: 248, copies: 3, relinks: 251, kept: 0, unusedToFolder: 12, sources: 0, groupFiles: 0, bytesToCopy: 1220 * 1048576, binMoves: 37, items: 251, unusedTotal: 12 } };
+    if (sc === 'unreadable') { plan.blocked = true; plan.blockCode = 'unreadable'; plan.blockReason = 'No se pueden leer 3 carpetas o archivos.'; plan.unreadable = [PROJ + '/Media/B-roll/IMG_0412.mov', PROJ + '/Media/B-roll/IMG_0413.mov', PROJ + '/Audio/Voz/take_07.wav']; }
+    if (sc === 'interrupted' && !env.recovered) { plan.blocked = true; plan.blockCode = 'interrupted'; plan.blockReason = 'Una organización anterior se interrumpió a mitad.'; }
+    if (sc === 'other') { plan.confirmations = ['Estas carpetas son de otros proyectos de Premiere y NO se tocarán: Spot30.']; plan.otherProjects = [{ path: '/Volumes/Rodaje/Spot30/Spot30_v2.prproj', excluded: '/Volumes/Rodaje/Spot30' }]; }
+    if (sc === 'otherbad') { plan.blocked = true; plan.blockCode = 'unreadable-project'; plan.blockReason = 'No se puede leer Spot30_v2.prproj'; plan.otherProjects = [{ path: PROJ + '/Spot30_v2.prproj', error: 'archivo dañado' }]; }
+    if (sc === 'space') { plan.blocked = true; plan.blockCode = 'no-space'; plan.blockReason = 'No hay espacio suficiente para copiar los medios externos (1281 MB necesarios, 819 MB libres).'; }
+    if (sc === 'missing') { plan.blocked = true; plan.blockCode = 'unresolved'; plan.blockReason = 'Hay medios que no se encuentran.'; plan.missing = [{ name: 'Entrevista_C.mov', path: '/Volumes/Rodaje/Spot_Verano/Media/Entrevistas/Entrevista_C.mov' }, { name: 'Cartela_final.psd', path: '/Volumes/Descargas/Cartela_final.psd' }]; }
+    if (sc === 'outside') { plan.blocked = true; plan.blockCode = 'outside'; plan.blockReason = 'La carpeta de assets sale de la carpeta del proyecto (enlace simbólico): ' + assets; }
+    if (sc === 'unsafe') { plan.blocked = true; plan.blockCode = 'unsafe-root'; plan.blockReason = 'El proyecto está guardado directamente en «/Volumes/Rodaje». Guárdalo dentro de su propia carpeta antes de organizarlo.'; }
+    return plan;
+  }
+
+  var engine = {
+    version: '2.5.0-sim',
+    buildPlan: function () { return new Promise(function (r) { setTimeout(function () { r(makePlan()); }, 350); }); },
+    createSession: function () { return Promise.resolve({ dir: '/sim/session1' }); },
+    execute: function (plan, progress, session, signal) {
+      return new Promise(function (resolve) {
+        var n = 0, total = 20;
+        (function step() {
+          if (signal && signal.cancelled) { resolve({ done: new Array(n * 5).join('x').split('x').map(function () { return { type: 'move' }; }), errors: [], cancelled: true, relinks: [], copiedBytes: 0 }); return; }
+          n++; progress(n, total, n < 15 ? 'Moviendo archivos…' : 'Copiando y verificando…');
+          if (n >= total) { var done = []; for (var i = 0; i < 248; i++) done.push({ type: 'move' }); for (i = 0; i < 3; i++) done.push({ type: 'copy' }); resolve({ done: done, errors: [], relinks: [{ nodeId: 'n1', to: '/x' }], copiedBytes: 1220 * 1048576 }); return; }
+          setTimeout(step, 70);
+        })();
+      });
+    },
+    finalizeSession: function () { env.hasSession = true; },
+    latestSession: function () { return (env.scenario === 'interrupted' && !env.recovered) || env.hasSession ? { meta: { createdAt: '2026-11-21T18:42:00Z', status: 'done' } } : null; },
+    findInterrupted: function () { return env.scenario === 'interrupted' && !env.recovered ? [{ dir: '/s', meta: { createdAt: '2026-11-21T18:42:00Z' } }] : []; },
+    undo: function () { return new Promise(function (r) { setTimeout(function () { r({ restored: env.scenario === 'interrupted' ? 14 : 251, failed: [], cleaned: env.scenario === 'interrupted' ? ['a', 'b'] : [], kept: [], relinks: [], sessionDir: '/sim/session1', relinksSkipped: 0 }); }, 300); }); },
+    completeUndo: function () { env.recovered = true; env.hasSession = false; },
+    writeReports: function () { return Promise.resolve({ htmlPath: '/sim/LOG.html', pdfPath: '/sim/LOG.pdf', jsonPath: '/sim/LOG.json' }); },
+    logDirFor: function (p) { return '/sim/LOG'; }
+  };
+
+  window.SystemPath = { EXTENSION: 'EXTENSION' };
+  window.CSInterface = function () {};
+  CSInterface.THEME_COLOR_CHANGED_EVENT = 'theme';
+  CSInterface.prototype.getSystemPath = function () { return '/sim/ext'; };
+  CSInterface.prototype.getHostEnvironment = function () { throw new Error('sin host'); };
+  CSInterface.prototype.addEventListener = function () {};
+  CSInterface.prototype.openURLInDefaultBrowser = function (u) { log('open ' + u); };
+  CSInterface.prototype.evalScript = function (script, cb) {
+    var out, name = /gpOrganizer\.(\w+)/.exec(script)[1];
+    if (name === 'getProjectInfo') out = { status: 'SUCCESS', projectPath: (env.scenario === 'changed' && env.openName !== 'Spot_Verano_v3') ? '/Volumes/Otro/Cliente_B.prproj' : PROJ + '/Spot_Verano_v3.prproj', projectFolder: PROJ, projectName: env.openName };
+    else if (name === 'getProfilesJSON') out = { 'Estándar': { '_Secuencias': [], 'Videos': ['mp4', 'mov'], 'Music & SFX': ['wav', 'mp3'], 'Images': ['jpg', 'png'], 'Z_Others': [] } };
+    else if (name === 'getProjectSnapshot') out = { categories: { 'Videos': [], 'Music & SFX': [] }, projectFolder: PROJ, items: [] };
+    else if (name === 'applyOrganization') { var p = JSON.parse(JSON.parse(script.replace(/^gpOrganizer\.applyOrganization\(/, '').replace(/\)$/, ''))); out = { status: 'SUCCESS', stats: { requested: p.relinks.length, relinked: p.relinks.length, binMoved: 37, relinkFailed: [], binFailed: [], undoSaved: true } }; }
+    else if (name === 'applyUndo') out = { status: 'SUCCESS', relinked: 3, binsRestored: 2, failed: [] };
+    else if (name === 'healthCheck') out = { status: 'SUCCESS', offline: [{ name: 'Entrevista_C.mov', path: '/Volumes/x/Entrevista_C.mov' }], noBin: [], duplicates: [], emptyBins: [] };
+    else if (name === 'getDebugLog') out = { premiereVersion: '25.0 (sim)', os: 'Mac', projectOpen: true, projectName: 'Spot_Verano_v3', projectSaved: true, projectPath: PROJ, totalItems: 251, offlineItems: 2 };
+    else out = { status: 'SUCCESS' };
+    setTimeout(function () { cb(JSON.stringify(out)); }, 25);
+  };
+  window.cep_node = { require: function (name) {
+    if (/updater/.test(name)) return {
+      checkForUpdate: function () { return new Promise(function (r) { setTimeout(function () { r(window.__env.update === 'none' ? { status: 'current', latest: { version: '2.4.1' } } : { status: 'available',
+        latest: { version: '2.5.9', date: '2026-11-24', url: 'u', sha256: 'x' },
+        changelog: [{ version: '2.5.9', date: '2026-11-24', features: ['Botón «Actualizar plugin»'], improvements: ['Más rápido al abrir'] }, { version: '2.5.5', date: '2026-11-20', features: ['Gráficos de Adobe se mueven'], improvements: [] }] }); }, 200); }); },
+      installUpdate: function (info) { return new Promise(function (res, rej) { setTimeout(function () { window.__env.update === 'fail' ? rej(new Error('La descarga no coincide con la huella esperada (sha256). No se ha instalado nada.')) : res({ ok: true, version: info.version }); }, 600); }); }
+    };
+    if (name === 'path') return { join: function () { return [].slice.call(arguments).join('/'); } };
+    if (name === 'child_process') return { execFile: function (c, a) { log('exec ' + c + ' ' + a.join(' ')); }, spawn: function () { return { stdin: { end: function (t) { log('copy ' + t); } } }; } };
+    return engine;
+  } };
+  window.cep = { fs: { showOpenDialogEx: function () { return { err: 0, data: ['/Volumes/Rodaje/Spot_Verano'] }; } } };
+
+  // Barra de escenarios
+  var bar = document.getElementById('harness');
+  function draw() {
+    bar.innerHTML = SC.map(function (s) { return '<button data-sc="' + s[0] + '" class="' + (env.scenario === s[0] ? 'on' : '') + '">' + s[1] + '</button>'; }).join('') +
+      '<button data-theme="light">Claro</button><button data-theme="dark">Oscuro</button>';
+  }
+  bar.addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    if (b.getAttribute('data-theme')) { document.documentElement.setAttribute('data-theme', b.getAttribute('data-theme')); return; }
+    env.scenario = b.getAttribute('data-sc'); env.recovered = false; env.hasSession = false; env.openName = 'Spot_Verano_v3';
+    draw(); window.__binflow.state.busy = false; window.__binflow.state.rootOverride = null; window.__binflow.go('home'); window.__binflow.refreshHome();
+  });
+  draw();
+  var q = /[?&]scenario=(\w+)/.exec(location.search); if (q) env.scenario = q[1];
+  var t = /[?&]theme=(light|dark)/.exec(location.search); if (t) document.documentElement.setAttribute('data-theme', t[1]);
+  draw();
+}());
+</script>
+<script src="../plugin/com.binflow.organizer/ui/ui-logic.js"></script>
+<script src="../plugin/com.binflow.organizer/main.js"></script>
+</body>
+</html>

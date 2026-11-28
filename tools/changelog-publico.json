@@ -1,0 +1,36 @@
+[
+  {
+    "version": "2.5.0",
+    "date": "2026-11-24",
+    "features": [
+      "Botón «Actualizar plugin»: BinFlow avisa cuando hay una versión nueva y se actualiza con un clic.",
+      "Antes de actualizar se guarda una copia de la versión actual; si algo falla, vuelve a la anterior sola."
+    ],
+    "improvements": [
+      "Solo avisa cuando de verdad hay una versión nueva; si estás al día o no hay internet, no muestra nada."
+    ]
+  },
+  {
+    "version": "2.4.1",
+    "date": "2026-11-24",
+    "features": [
+      "Los gráficos de Adobe (.aegraphic, .mogrt, .aep, .aet, .prgraphic, .c4d) ahora se mueven a su carpeta como el resto de archivos.",
+      "Antes de organizar te avisa de cuáles quedarán sin conexión en Premiere para que los re-enlaces a mano; el informe lista de dónde a dónde se movieron."
+    ],
+    "improvements": [
+      "Nuevo interruptor en Ajustes para mover o no los gráficos de Adobe."
+    ]
+  },
+  {
+    "version": "2.4.0",
+    "date": "2026-11-24",
+    "features": [
+      "Interfaz nueva con estilo propio: un solo flujo, claro y oscuro según Premiere.",
+      "Cada problema tiene su pantalla con el porqué y qué hacer."
+    ],
+    "improvements": [
+      "Arreglo de la carga del panel en Premiere 2027.",
+      "Instalador más seguro: comprueba la copia antes de sustituir la versión anterior."
+    ]
+  }
+]
